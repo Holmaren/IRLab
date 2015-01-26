@@ -23,8 +23,22 @@ public class PostingsEntry implements Comparable<PostingsEntry>, Serializable {
      *  descending order.
      */
     public int compareTo( PostingsEntry other ) {
-	return Double.compare( other.score, score );
+    	    return Double.compare( other.score, score );
     }
+    
+    public boolean equals(PostingsEntry other){
+    	    return this.docID==other.docID;
+    }
+
+    public PostingsEntry( int docID){
+    	    this.docID=docID;	    
+    	    //this.score=score;
+    }
+    
+    public int getDocID(){
+    	    return this.docID;
+    }
+
 
     //
     //  YOUR CODE HERE

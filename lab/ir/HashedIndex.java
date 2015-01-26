@@ -12,6 +12,8 @@ package ir;
 
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.Set;
 
 
 /**
@@ -22,14 +24,23 @@ public class HashedIndex implements Index {
     /** The index as a hashtable. */
     private HashMap<String,PostingsList> index = new HashMap<String,PostingsList>();
 
+    
+    public HashedIndex(){
+    }
+    
 
     /**
      *  Inserts this token in the index.
      */
     public void insert( String token, int docID, int offset ) {
-	//
-	//  YOUR CODE HERE
-	//
+	PostingsList list=index.get(token);
+	if(list==null){
+		list=new PostingsList();
+		index.put(token,list);
+	}
+	PostingsEntry newEntry=new PostingsEntry(docID);
+	list.addEntry(newEntry);
+	
     }
 
 
@@ -37,10 +48,9 @@ public class HashedIndex implements Index {
      *  Returns all the words in the index.
      */
     public Iterator<String> getDictionary() {
-	// 
-	//  REPLACE THE STATEMENT BELOW WITH YOUR CODE
-	//
-	return null;
+	Set<String> keySet=index.keySet();
+	Iterator<String> it=keySet.iterator();
+	return it;
     }
 
 
@@ -49,10 +59,8 @@ public class HashedIndex implements Index {
      *  if the term is not in the index.
      */
     public PostingsList getPostings( String token ) {
-	// 
-	//  REPLACE THE STATEMENT BELOW WITH YOUR CODE
-	//
-	return null;
+	PostingsList list=index.get(token);
+	return list;
     }
 
 
@@ -60,10 +68,13 @@ public class HashedIndex implements Index {
      *  Searches the index for postings matching the query.
      */
     public PostingsList search( Query query, int queryType, int rankingType, int structureType ) {
-	// 
-	//  REPLACE THE STATEMENT BELOW WITH YOUR CODE
-	//
-	return null;
+	LinkedList<String> terms=query.terms;
+	
+	String term=terms.getFirst();
+	
+	return index.get(term);
+	
+	//return null;
     }
 
 
