@@ -9,10 +9,12 @@
 package ir;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 
 public class PostingsEntry implements Comparable<PostingsEntry>, Serializable {
     
     public int docID;
+    public ArrayList<Integer> offsets=null;
     public double score;
 
     /**
@@ -22,6 +24,19 @@ public class PostingsEntry implements Comparable<PostingsEntry>, Serializable {
      *  The comparison is defined so that entries will be put in 
      *  descending order.
      */
+     
+     public PostingsEntry(int docID){
+    	    this.docID=docID;
+    	    //this.score=score;
+    }
+    
+    public void addOffset(int offset){
+    	    if(this.offsets==null){
+    	    	this.offsets=new ArrayList<Integer>();	    
+    	    }
+    	    this.offsets.add(offset);
+    }
+     
     public int compareTo( PostingsEntry other ) {
     	    return Double.compare( other.score, score );
     }
@@ -30,13 +45,13 @@ public class PostingsEntry implements Comparable<PostingsEntry>, Serializable {
     	    return this.docID==other.docID;
     }
 
-    public PostingsEntry( int docID){
-    	    this.docID=docID;	    
-    	    //this.score=score;
-    }
     
     public int getDocID(){
     	    return this.docID;
+    }
+    
+    public ArrayList<Integer> getOffsets(){
+    	return this.offsets;	    
     }
 
 

@@ -20,7 +20,11 @@ public class PostingsList implements Serializable {
     /** The postings list as a linked list. */
     private LinkedList<PostingsEntry> list = new LinkedList<PostingsEntry>();
 
-
+    public PostingsList(){
+    		    
+    }
+    
+    
     /**  Number of postings in this list  */
     public int size() {
 	return list.size();
@@ -31,49 +35,33 @@ public class PostingsList implements Serializable {
 	return list.get( i );
     }
 
-    public PostingsList(){
-    		    
-    }
     
     public void addEntry(PostingsEntry newEntry){
     	    //The entries needs to be sorted according to docID, therefore
     	    //we need to find the right location for the entry
-    	    /*Iterator<PostingsEntry> it=list.iterator();
-    	    
-    	    int pos=0;
-    	    
-    	    PostingsEntry temp=it.next();
-    	    
-    	    while(newEntry.docID>temp.docID){
-    	    	pos++;	 
-    	    	if(it.hasNext()){
-    	    		temp=it.next();
-    	    	}
-    	    	else{
-    	    		break;
-    	    	}
-    	    }*/
-    	    //if(pos>=list.size()){
-    	    
+    	 
     	    if(list.size()>0){
-    	    
     	    	    if(!this.checkContains(newEntry.docID)){
     	    		    list.add(newEntry);
-    	    	}
+    	    	    }
     	    }
     	    else{
     	    	list.add(newEntry);	    
     	    }
-    	    
-    	    	    
-    	    //}
-    	    //else{
-    	    	  //  list.add(pos,newEntry);
-    	    //}
+    	   
+    }
+    
+    public void addOffsetToLastEntry(int offset){
+    	    list.getLast().addOffset(offset);
     }
     
     //Checks if the entry already exists in the list
-    private boolean checkContains(int newdocID){
+    public boolean checkContains(int newdocID){
+    	    
+    	    if(this.list.size()==0){
+    	    	return false;	    
+    	    }
+    	    
     	    int last=list.getLast().docID;
     	    if(newdocID>last){
     	    	return false;	    
@@ -89,6 +77,10 @@ public class PostingsList implements Serializable {
     	    	}
     	    }
     	    return false;
+    }
+    
+    public Iterator<PostingsEntry> iterator(){
+    	return list.iterator();	    
     }
     
     
