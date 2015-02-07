@@ -14,6 +14,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Set;
+import java.util.ArrayList;
+import java.io.*;
 
 
 /**
@@ -22,8 +24,14 @@ import java.util.Set;
 public class HashedIndex implements Index {
 
     /** The index as a hashtable. */
-    private HashMap<String,PostingsList> index = new HashMap<String,PostingsList>();
+    private HashMap<String,PostingsList> index = new HashMap<String,PostingsList>(10000);
 
+    private int filesProcessedSinceClear=0;
+    private int maxFilesProcessedBeforeClear=500;
+    private int lastDocID=-1;
+    
+    private String filePrefix="index";
+    
     
     public HashedIndex(){
     }
@@ -33,7 +41,31 @@ public class HashedIndex implements Index {
      *  Inserts this token in the index.
      */
     public void insert( String token, int docID, int offset ) {
-	PostingsList list=index.get(token);
+    	    
+    	//If we should save the index to disk (Task 1.6 lab1)
+    	if(SearchGUI.saveIndex){
+    		
+    		//If we have processed the maximum amount of files and this is a new file
+    		if(filesProcessedSinceClear>maxFilesProcessedBeforeClear && 
+    			lastDocID!=docID){
+    		
+    			//Write the current index to files
+    			this.writeCurrentIndexToFiles();
+    			//Clear the index
+    			index.clear();
+    			filesProcessedSinceClear=0;
+    		
+    			}
+    		
+		if(lastDocID!=docID){
+			filesProcessedSinceClear++;	
+		}
+		
+    		lastDocID=docID;
+    		    	    
+    	}
+    	   
+    	PostingsList list=index.get(token);
 	
 	if(list==null){
 		list=new PostingsList();
@@ -49,7 +81,6 @@ public class HashedIndex implements Index {
 	else{
 		list.addOffsetToLastEntry(offset); 
 	}
-	
 	
     }
 
@@ -86,16 +117,50 @@ public class HashedIndex implements Index {
     	    
     	if(queryType==Index.INTERSECTION_QUERY){
     	    
-    		//Put the postingslist of the first term in res
-    		PostingsList res=index.get(terms.getFirst());
-    		
-    		// i starts at 1 since the first postingslist is already in res
-    		for(int i=1;i<nrQTerms;i++){
-    			String term=terms.get(i);
-    			res=this.intersect(res,index.get(term));
+    		//If the index is saved on disk
+    		if(SearchGUI.saveIndex){
+    			
+    			ArrayList<PostingsList> lists=new ArrayList<PostingsList>();
+    			
+    			for(int i=0;i<nrQTerms;i++){
+    				String curTerm=terms.get(i);
+    				try{
+    					ObjectInputStream oins=new ObjectInputStream(new FileInputStream(curTerm));
+    					IndexEntry ent=(IndexEntry) oins.readObject();
+    					if(ent.getTerm()!=curTerm){
+    					System.err.println("ERROR: The terms doesn't match");	
+    					}
+    					lists.add(ent.getList());
+    					oins.close();
+    				}
+    				catch(Exception ex){
+    					ex.printStackTrace();	
+    				}
+    				
+    					
+    			}
+    			
+    			PostingsList res=lists.get(0);
+    			
+    			for(int i=1;i<nrQTerms;i++){
+    				res=this.intersect(res,lists.get(i));	
+    			}
+    			
+    			return res;
     		}
+    		else{
+    		
+    			//Put the postingslist of the first term in res
+    			PostingsList res=index.get(terms.getFirst());
+    		
+    			// i starts at 1 since the first postingslist is already in res
+    			for(int i=1;i<nrQTerms;i++){
+    				String term=terms.get(i);
+    				res=this.intersect(res,index.get(term));
+    			}
 	
-    		return res;
+    			return res;
+    		}
 	}
 	else if(queryType==Index.PHRASE_QUERY){
 		
@@ -259,6 +324,147 @@ public class HashedIndex implements Index {
     	   	   }
     	   } 
     	   
+    }
+    
+    /**
+    	Function to write the current Index to files
+    */
+    private void writeCurrentIndexToFiles(){
+    	    
+    	    Iterator<String> keySet=index.keySet().iterator();
+    	    
+    	    while(keySet.hasNext()){
+    	    
+    	    	    String curKey=keySet.next();
+    	    	    PostingsList curList=index.get(curKey);
+    	    	    PostingsList toWrite=null;
+    	    	    
+    	    	    try{
+    	    	    	//Create a file object
+    	    	    	File indexDir=new File(filePrefix);
+    	    	    	File curF=new File(indexDir,curKey);
+    	    	    	//Check if the file exists (in that case read the object in it)
+    	    	   	 if(curF.exists()){
+    	    	    	    	ObjectInputStream oins=new ObjectInputStream(new FileInputStream(curF));
+    	    	    	   	 IndexEntry prevEntry=(IndexEntry) oins.readObject();
+    	    	    	   	 oins.close();
+    	    	    	    
+    	    	    	   	 if(!prevEntry.getTerm().equals(curKey)){
+    	    	    	    	    System.err.println("ERROR: The Keys does not match!");    
+    	    	    		    }
+    	    	    	    
+    	    	    		    toWrite=HashedIndex.mergeLists(prevEntry.getList(),curList);
+    	    	    	    
+    	    	   	 }
+    	    	    	else{
+    	    	    	    toWrite=curList;	    
+    	    	    	}
+    	    	    
+    	    	    	IndexEntry writeToFile=new IndexEntry(curKey,toWrite);
+    	    	    
+    	    	    	ObjectOutputStream oos=new ObjectOutputStream(new FileOutputStream(curF));
+    	    	    	oos.writeObject(writeToFile);
+    	    	    	oos.flush();
+    	    	    	oos.close();
+    	    	    
+    	    	    }
+    	    	    catch(Exception e){
+    	    	    	    System.err.println("Error writing index to file");
+    	    	    	    e.printStackTrace();
+    	    	    } 
+    	    	    
+    	    }    
+    }
+    
+    /**
+    	Function to merge two postingslists (docID should be sorted)
+    */
+    public static PostingsList mergeLists(PostingsList p1, PostingsList p2){
+
+    	    PostingsList res=new PostingsList();
+    	    
+    	    //If the first entry in p2 has a bigger docID than the last in p1 we can just
+    	    //add all elements in p2 to the end of p1
+    	    if(p2.get(0).getDocID()>p1.get(p1.size()-1).getDocID()){
+    	    	    Iterator<PostingsEntry> it=p2.iterator();
+    	    	    res=p1;
+    	    	    while(it.hasNext()){
+    	    	    	PostingsEntry curEntry=it.next();
+    	    	    	res.addEntry(curEntry);
+    	    	    }
+    	    }
+    	    else if(p1.get(0).getDocID()>p2.get(p2.size()-1).getDocID()){
+    	    	Iterator<PostingsEntry> it=p1.iterator();
+    	    	res=p2;
+    	    	while(it.hasNext()){
+    	    	    	PostingsEntry curEntry=it.next();
+    	    	    	res.addEntry(curEntry);
+    	    	    }    
+    	    }
+    	    else{
+    	    	
+    	    	    if(p1.size()==0){
+    	    	    	return p2;	    
+    	    	    }
+    	    	    else if(p2.size()==0){
+    	    	    	return p1;	    
+    	    	    }
+    	    	
+    	    	    
+    	    	Iterator<PostingsEntry> it1=p1.iterator();
+    	    	Iterator<PostingsEntry> it2=p2.iterator();
+    	    	
+    	    	PostingsEntry curP1=it1.next();
+    	    	PostingsEntry curP2=it2.next();
+    	    	
+    	    	while(curP1!=null || curP2!=null){
+    	    		//If iterator1 is empty
+    	    		if(curP1==null){
+    	    			res.addEntry(curP2);
+    	    			if(it2.hasNext()){
+    	    				curP2=it2.next();	
+    	    			}
+    	    			else{
+    	    				curP2=null;
+    	    			}
+    	    		}
+    	    		//If iterator 2 is empty
+    	    		if(curP2==null){
+    	    			res.addEntry(curP1);
+    	    			if(it1.hasNext()){
+    	    				curP1=it1.next();	
+    	    			}
+    	    			else{
+    	    				curP1=null;	
+    	    			}
+    	    		}
+    	    		else{
+    	    			if(curP1.getDocID()<=curP2.getDocID()){
+    	    				res.addEntry(curP1);
+    	    				if(it1.hasNext()){
+    	    					curP1=it1.next();	
+    	    				}
+    	    				else{
+    	    					curP1=null;	
+    	    				}
+    	    				
+    	    			}
+    	    			else{
+    	    				res.addEntry(curP2);
+    	    				if(it2.hasNext()){
+    	    					curP2=it2.next();	
+    	    				}
+    	    				else{
+    	    					curP2=null;
+    	    				}
+    	    			}
+    	    		}  		
+    	    	}
+    	    
+	    }
+	    
+	    return res;
+    	    
     }
 
 

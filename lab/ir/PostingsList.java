@@ -11,6 +11,7 @@ package ir;
 import java.util.LinkedList;
 import java.io.Serializable;
 import java.util.Iterator;
+import java.lang.StringBuffer;
 
 /**
  *   A list of postings for a given word.
@@ -83,6 +84,20 @@ public class PostingsList implements Serializable {
     	return list.iterator();	    
     }
     
+    public String toString(){
+    	    
+    	    StringBuffer buf=new StringBuffer();
+    	    
+    	    if(list.size()!=0){
+    	    	    buf.append(list.get(0));
+    	    	    for(int i=1;i<list.size();i++){
+    	    		    buf.append("&");
+    	    		    buf.append(list.get(i));
+    	    	    }
+
+    	    }
+	    return buf.toString();
+    }
     
     //
     //  YOUR CODE HERE

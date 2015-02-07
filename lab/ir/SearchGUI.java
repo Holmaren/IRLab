@@ -55,6 +55,9 @@ public class SearchGUI extends JFrame {
 
     /**  Directory from which the code is compiled and run. */
     public static final String homeDir = "/home/mathias/Documents/Skola/IR/lab1/lab";
+    
+    /** Variable to tell if the index should be saved or not (Task 1.6 lab1) */
+    public static boolean saveIndex=false;
 
 
     /*
@@ -366,6 +369,10 @@ public class SearchGUI extends JFrame {
 		if ( i < args.length ) {
 		    dirNames.add( args[i++] );
 		}
+	    }
+	    else if("-i".equals(args[i])){	 
+	    	SearchGUI.saveIndex=true;
+	    	i++;
 	    }
 	    else {
 		System.err.println( "Unknown option: " + args[i] );

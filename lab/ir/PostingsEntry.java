@@ -10,6 +10,7 @@ package ir;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.lang.StringBuffer;
 
 public class PostingsEntry implements Comparable<PostingsEntry>, Serializable {
     
@@ -52,6 +53,22 @@ public class PostingsEntry implements Comparable<PostingsEntry>, Serializable {
     
     public ArrayList<Integer> getOffsets(){
     	return this.offsets;	    
+    }
+    
+    public String toString(){
+    
+	StringBuffer buf=new StringBuffer();
+	buf.append(docID);
+	buf.append("|");
+	if(offsets!=null && offsets.size()!=0){
+		buf.append(offsets.get(0));
+		for(int i=1;i<offsets.size();i++){
+			buf.append(",");
+			buf.append(offsets.get(i));
+		}
+	}
+	
+	return buf.toString();
     }
 
 
