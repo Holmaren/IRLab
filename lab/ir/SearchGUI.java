@@ -184,7 +184,14 @@ public class SearchGUI extends JFrame {
 			buf.append( "\nFound " + results.size() + " matching document(s)\n\n" );
 			for ( int i=0; i<results.size(); i++ ) {
 			    buf.append( " " + i + ". " );
-			    String filename = indexer.index.docIDs.get( "" + results.get(i).docID );
+			    String filename=null;
+			    if(SearchGUI.saveIndex){
+			    	   // System.err.println("SaveIndex");
+			    	 filename=results.get(i).docName;   
+			    }
+			    else{
+			    	 filename = indexer.index.docIDs.get( "" + results.get(i).docID );
+			    }
 			    if ( filename == null ) {
 				buf.append( "" + results.get(i).docID );
 			    }
@@ -350,6 +357,9 @@ public class SearchGUI extends JFrame {
 		File dokDir = new File( dirNames.get( i ));
 		indexer.processFiles( dokDir );
 	    }
+	    if(SearchGUI.saveIndex){
+	    	    indexer.flushIndex();
+	    }
 	    resultWindow.setText( "\n  Done!" );
 	}
     };
@@ -363,6 +373,7 @@ public class SearchGUI extends JFrame {
      */
     private void decodeArgs( String[] args ) {
 	int i=0, j=0;
+	boolean foundI=false;
 	while ( i < args.length ) {
 	    if ( "-d".equals( args[i] )) {
 		i++;
@@ -371,13 +382,19 @@ public class SearchGUI extends JFrame {
 		}
 	    }
 	    else if("-i".equals(args[i])){	 
-	    	SearchGUI.saveIndex=true;
+	    	foundI=true;
 	    	i++;
 	    }
 	    else {
 		System.err.println( "Unknown option: " + args[i] );
 		break;
 	    }
+	}
+	if(foundI){
+		SearchGUI.saveIndex=true;
+	}
+	else{
+		SearchGUI.saveIndex=false;	
 	}
     }				    
 

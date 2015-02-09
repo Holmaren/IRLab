@@ -11,5 +11,5 @@ then
 fi
 
 
-java -Xmx1024m -cp .:pdfbox/ ir.SearchGUI -i -d davisWiki/
+java -Xmx1024m -cp .:pdfbox/ ir.SearchGUI -d davisWiki/
 

@@ -27,10 +27,14 @@ public class HashedIndex implements Index {
     private HashMap<String,PostingsList> index = new HashMap<String,PostingsList>(10000);
 
     private int filesProcessedSinceClear=0;
-    private int maxFilesProcessedBeforeClear=500;
+    private int maxFilesProcessedBeforeClear=10000;
     private int lastDocID=-1;
     
     private String filePrefix="index";
+    
+    private String indexInfoDirectory="indexInfo";
+    private String docNamesFile="IndexDocNames.txt";
+    private String docLengthFile="IndexDocLength.txt";
     
     
     public HashedIndex(){
@@ -45,14 +49,18 @@ public class HashedIndex implements Index {
     	//If we should save the index to disk (Task 1.6 lab1)
     	if(SearchGUI.saveIndex){
     		
+    		
     		//If we have processed the maximum amount of files and this is a new file
     		if(filesProcessedSinceClear>maxFilesProcessedBeforeClear && 
     			lastDocID!=docID){
+    			System.err.println("Writing to files");
     		
     			//Write the current index to files
     			this.writeCurrentIndexToFiles();
     			//Clear the index
     			index.clear();
+    			this.docIDs.clear();
+    			this.docLengths.clear();
     			filesProcessedSinceClear=0;
     		
     			}
@@ -74,6 +82,8 @@ public class HashedIndex implements Index {
 	//If there is no entry for the docID
 	if(!list.checkContains(docID)){
 		PostingsEntry newEntry=new PostingsEntry(docID);
+		newEntry.setDocName(this.docIDs.get(""+docID));
+		//System.err.println(this.docIDs.get(""+docID));
 		newEntry.addOffset(offset);
 		list.addEntry(newEntry);	
 	}
@@ -82,6 +92,17 @@ public class HashedIndex implements Index {
 		list.addOffsetToLastEntry(offset); 
 	}
 	
+    }
+    
+    public void flushIndex(){
+    
+    	System.err.println("Flushing the current index");
+    	    
+	this.writeCurrentIndexToFiles();
+	index.clear();
+	this.docIDs.clear();
+    	this.docLengths.clear();
+    	    
     }
 
 
@@ -114,6 +135,7 @@ public class HashedIndex implements Index {
     		
     	int nrQTerms=query.size();
     	    
+    	File indexDir=new File(filePrefix);
     	    
     	if(queryType==Index.INTERSECTION_QUERY){
     	    
@@ -125,19 +147,35 @@ public class HashedIndex implements Index {
     			for(int i=0;i<nrQTerms;i++){
     				String curTerm=terms.get(i);
     				try{
-    					ObjectInputStream oins=new ObjectInputStream(new FileInputStream(curTerm));
-    					IndexEntry ent=(IndexEntry) oins.readObject();
-    					if(ent.getTerm()!=curTerm){
-    					System.err.println("ERROR: The terms doesn't match");	
+    					//If the filename is too large
+    					String fileName=curTerm;
+    					if(curTerm.length()>100){
+    						fileName=fileName.substring(0,100);
     					}
-    					lists.add(ent.getList());
-    					oins.close();
+    					File file=new File(indexDir,fileName);
+    					if(file.exists()){
+    						ObjectInputStream oins=new ObjectInputStream(new FileInputStream(file));
+    						IndexEntry ent=(IndexEntry) oins.readObject();
+    						if(!ent.getTerm().equals(curTerm)){
+    							System.err.println("ERROR: The terms doesn't match");	
+    							//System.err.println("Ent.getTerm="+ent.getTerm());
+    							//System.err.println("CurTerm="+curTerm);
+    						}
+    						lists.add(ent.getList());
+    						oins.close();
+    					}
+    					else{
+    						//if atleast one term doesn't exist
+    						return null;
+    					}
     				}
     				catch(Exception ex){
     					ex.printStackTrace();	
-    				}
-    				
-    					
+    				}	
+    			}
+    			
+    			if(lists.size()==0){
+    				return null;	
     			}
     			
     			PostingsList res=lists.get(0);
@@ -164,15 +202,63 @@ public class HashedIndex implements Index {
 	}
 	else if(queryType==Index.PHRASE_QUERY){
 		
-		PostingsList res=index.get(terms.getFirst());
-		
-		for(int i=1;i<nrQTerms;i++){
-			String term=terms.get(i);
-			res=this.phraseIntersect(res,index.get(term),1);
+		if(SearchGUI.saveIndex){
+			ArrayList<PostingsList> lists=new ArrayList<PostingsList>();
+    			
+    			for(int i=0;i<nrQTerms;i++){
+    				String curTerm=terms.get(i);
+    				try{
+    					//If the filename is too large
+    					String fileName=curTerm;
+    					if(curTerm.length()>100){
+    						fileName=fileName.substring(0,100);
+    					}
+    					File file=new File(indexDir,fileName);
+    					if(file.exists()){
+    						ObjectInputStream oins=new ObjectInputStream(new FileInputStream(file));
+    						IndexEntry ent=(IndexEntry) oins.readObject();
+    						if(!ent.getTerm().equals(curTerm)){
+    							System.err.println("ERROR: The terms doesn't match");	
+    							//System.err.println("Ent.getTerm="+ent.getTerm());
+    							//System.err.println("CurTerm="+curTerm);
+    						}
+    						lists.add(ent.getList());
+    						oins.close();
+    					}
+    					else{
+    						//if atleast one term doesn't exist
+    						return null;	
+    					}
+    				}
+    				catch(Exception ex){
+    					ex.printStackTrace();	
+    				}	
+    			}
+    			
+    			if(lists.size()==0){
+    				return null;	
+    			}
+    			
+    			PostingsList res=lists.get(0);
+    			
+    			for(int i=1;i<nrQTerms;i++){
+    				res=this.phraseIntersect(res,lists.get(i),1);	
+    			}
+    			
+    			return res;
+			
 		}
+		else{	
+			PostingsList res=index.get(terms.getFirst());
+		
+			for(int i=1;i<nrQTerms;i++){
+				String term=terms.get(i);
+				res=this.phraseIntersect(res,index.get(term),1);
+			}
 		
 		
-		return res;
+			return res;
+		}
 	}
 	else{
 		System.err.println("ERROR: QueryType not recognized or unimplemented");
@@ -201,6 +287,7 @@ public class HashedIndex implements Index {
     	   while(true){
     	   	   if(curP1.equals(curP2)){
     	   	   	   PostingsEntry ent=new PostingsEntry(curP1.docID);
+    	   	   	   ent.setDocName(curP1.docName);
     	   	   	   //System.err.println("Match. DocID:"+curP1.docID);
     	   	   	   res.addEntry(ent);
     	   	   	   //If there is more entries left
@@ -287,6 +374,7 @@ public class HashedIndex implements Index {
     	   	   	   	   	   	//Match
     	   	   	   	   	   	if(match==null){
     	   	   	   	   	   		match=new PostingsEntry(curP1.docID);
+    	   	   	   	   	   		match.setDocName(curP1.docName);
     	   	   	   	   	   	}
     	   	   	   	   	   	match.addOffset(curOffsetP2);
     	   	   	   	   	   }
@@ -332,19 +420,27 @@ public class HashedIndex implements Index {
     private void writeCurrentIndexToFiles(){
     	    
     	    Iterator<String> keySet=index.keySet().iterator();
-    	    
-    	    while(keySet.hasNext()){
-    	    
-    	    	    String curKey=keySet.next();
-    	    	    PostingsList curList=index.get(curKey);
-    	    	    PostingsList toWrite=null;
+    	    try{
+    	    	    File indexDir=new File(filePrefix);
+    	    	    if(!indexDir.exists()){
+    	    	    	indexDir.mkdir();	    
+    	    	    }
     	    	    
-    	    	    try{
-    	    	    	//Create a file object
-    	    	    	File indexDir=new File(filePrefix);
-    	    	    	File curF=new File(indexDir,curKey);
-    	    	    	//Check if the file exists (in that case read the object in it)
-    	    	   	 if(curF.exists()){
+    	    	    while(keySet.hasNext()){
+    	    
+    	    	    	    String curKey=keySet.next();
+    	    	    	    PostingsList curList=index.get(curKey);
+    	    	    	    PostingsList toWrite=null;
+    	    	     
+    	    	    	    //Create a file object
+    	    	    	    //If the filename is too large
+    	    	    	    String fileName=curKey;
+    	    	    	    if(curKey.length()>100){
+    	    	    	    	fileName=fileName.substring(0,100);
+    	    	    	    }
+    	    	    	    File curF=new File(indexDir,fileName);
+    	    	    	    //Check if the file exists (in that case read the object in it)
+    	    	    	    if(curF.exists()){
     	    	    	    	ObjectInputStream oins=new ObjectInputStream(new FileInputStream(curF));
     	    	    	   	 IndexEntry prevEntry=(IndexEntry) oins.readObject();
     	    	    	   	 oins.close();
@@ -355,25 +451,66 @@ public class HashedIndex implements Index {
     	    	    	    
     	    	    		    toWrite=HashedIndex.mergeLists(prevEntry.getList(),curList);
     	    	    	    
-    	    	   	 }
-    	    	    	else{
-    	    	    	    toWrite=curList;	    
-    	    	    	}
+    	    	    	    }
+    	    	    	    else{
+    	    	    	    	    toWrite=curList;	    
+    	    	    	    }
     	    	    
-    	    	    	IndexEntry writeToFile=new IndexEntry(curKey,toWrite);
+    	    	    	    IndexEntry writeToFile=new IndexEntry(curKey,toWrite);
     	    	    
-    	    	    	ObjectOutputStream oos=new ObjectOutputStream(new FileOutputStream(curF));
-    	    	    	oos.writeObject(writeToFile);
-    	    	    	oos.flush();
-    	    	    	oos.close();
-    	    	    
+    	    	    	    ObjectOutputStream oos=new ObjectOutputStream(new FileOutputStream(curF));
+    	    	    	    oos.writeObject(writeToFile);
+    	    	    	    oos.flush();
+    	    	    	    oos.close();
+
     	    	    }
-    	    	    catch(Exception e){
-    	    	    	    System.err.println("Error writing index to file");
-    	    	    	    e.printStackTrace();
-    	    	    } 
     	    	    
-    	    }    
+    	    	    //Also has to save the docNames and the docLengths
+    	    	    File infoDir=new File(indexDir,indexInfoDirectory);
+    	    	    if(!infoDir.exists()){
+    	    	    	infoDir.mkdir();    
+    	    	    }
+    	    	    File docNames=new File(infoDir,docNamesFile);
+    	    	    
+    	    	    PrintWriter namesOut= new PrintWriter(new BufferedWriter(new FileWriter(docNames,true)));
+    	    	    
+    	    	    Iterator<String> allDocIDs=this.docIDs.keySet().iterator();
+    	    	    
+    	    	    while(allDocIDs.hasNext()){
+    	    	    
+    	    	    	    String curDocID=allDocIDs.next();
+    	    	    	    
+    	    	    	    String writeString=curDocID+ " " + docIDs.get(curDocID);
+    	    	    	    
+    	    	    	    namesOut.println(writeString);
+    	    	    	    
+    	    	    }
+    	    	    namesOut.close();
+    	    	    
+    	    	    File lenFile=new File(infoDir,docLengthFile);
+    	    	    
+    	    	    PrintWriter lenOut=new PrintWriter(new BufferedWriter(new FileWriter(lenFile,true)));
+    	    	    
+    	    	    Iterator<String> lenIt=this.docLengths.keySet().iterator();
+    	    	    
+    	    	    while(lenIt.hasNext()){
+    	    	    
+    	    	    	    String curDocID=lenIt.next();
+    	    	    	    
+    	    	    	    String writeString=curDocID + " " + docLengths.get(curDocID);
+    	    	    	    
+    	    	    	    lenOut.println(writeString);
+    	    	    	    
+    	    	    }
+    	    	    lenOut.close();
+    	    	    
+    	    	    
+    	    
+    } catch(Exception e){
+    	    	   System.err.println("Error writing index to file");
+    	    	   e.printStackTrace();
+    	    	    }
+    	    	    
     }
     
     /**

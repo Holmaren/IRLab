@@ -71,6 +71,8 @@ public class Indexer {
     public void processFiles( File f ) {
 	// do not try to index fs that cannot be read
 	if ( f.canRead() ) {
+		//System.err.println("ProcessFiles");
+		//System.err.println("SaveIndex="+SearchGUI.saveIndex);
 	    if ( f.isDirectory() ) {
 		String[] fs = f.list();
 		// an IO error could occur
@@ -121,6 +123,11 @@ public class Indexer {
 	}
     }
 
+    public void flushIndex(){
+    	index.flushIndex();	    
+    }
+    
+    
     
     /* ----------------------------------------------- */
 

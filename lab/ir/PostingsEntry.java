@@ -15,6 +15,7 @@ import java.lang.StringBuffer;
 public class PostingsEntry implements Comparable<PostingsEntry>, Serializable {
     
     public int docID;
+    public String docName=null;
     public ArrayList<Integer> offsets=null;
     public double score;
 
@@ -46,6 +47,11 @@ public class PostingsEntry implements Comparable<PostingsEntry>, Serializable {
     	    return this.docID==other.docID;
     }
 
+    public void setDocName(String docName){
+    	    
+    	   this.docName=docName; 
+    	  }
+    
     
     public int getDocID(){
     	    return this.docID;
