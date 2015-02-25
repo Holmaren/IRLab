@@ -12,6 +12,7 @@ import java.util.LinkedList;
 import java.io.Serializable;
 import java.util.Iterator;
 import java.lang.StringBuffer;
+import java.util.Collections;
 
 /**
  *   A list of postings for a given word.
@@ -97,6 +98,13 @@ public class PostingsList implements Serializable {
 
     	    }
 	    return buf.toString();
+    }
+    
+    
+    public void sortPostingsList(){
+    
+    	    Collections.sort(list);
+    	    
     }
     
     //

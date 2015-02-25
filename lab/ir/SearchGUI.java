@@ -357,7 +357,7 @@ public class SearchGUI extends JFrame {
 		File dokDir = new File( dirNames.get( i ));
 		indexer.processFiles( dokDir );
 	    }
-	    if(SearchGUI.saveIndex){
+	    if(SearchGUI.saveIndex && dirNames.size()!=0){
 	    	    indexer.flushIndex();
 	    }
 	    resultWindow.setText( "\n  Done!" );

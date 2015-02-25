@@ -29,7 +29,7 @@ public class PostingsEntry implements Comparable<PostingsEntry>, Serializable {
      
      public PostingsEntry(int docID){
     	    this.docID=docID;
-    	    //this.score=score;
+    	    this.score=0;
     }
     
     public void addOffset(int offset){
@@ -43,6 +43,7 @@ public class PostingsEntry implements Comparable<PostingsEntry>, Serializable {
     	    return Double.compare( other.score, score );
     }
     
+    
     public boolean equals(PostingsEntry other){
     	    return this.docID==other.docID;
     }
@@ -52,7 +53,13 @@ public class PostingsEntry implements Comparable<PostingsEntry>, Serializable {
     	   this.docName=docName; 
     	  }
     
-    
+    public void setScore(double score){
+
+    	    this.score=score;
+	    
+    }
+    	  
+    	  
     public int getDocID(){
     	    return this.docID;
     }

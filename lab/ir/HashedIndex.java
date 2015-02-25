@@ -15,6 +15,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Set;
 import java.util.ArrayList;
+import java.lang.Math;
 import java.io.*;
 
 
@@ -259,6 +260,11 @@ public class HashedIndex implements Index {
 		
 			return res;
 		}
+	}
+	else if(queryType==Index.RANKED_QUERY){
+		
+		PostingsList res=this.fastCosineScore(query,0);
+		return res;
 	}
 	else{
 		System.err.println("ERROR: QueryType not recognized or unimplemented");
@@ -603,6 +609,73 @@ public class HashedIndex implements Index {
 	    return res;
     	    
     }
+    
+    /**
+    	Function to calculate the cosine score and return the top
+    	K results
+    */
+    private PostingsList fastCosineScore(Query q, int K){
+    	    
+    	    HashMap<String,Double> scores=new HashMap<String,Double>();
+    	    LinkedList<String> terms=q.terms;
+    	    
+    	    int nrDocsInCorpus=this.docIDs.keySet().size();
+    	    
+    	    //First add up all scores
+    	    for(String term:terms){
+    	    	
+    	    	PostingsList curList=index.get(term);
+    	    	int dft=curList.size();
+    	    	double termIDF=Math.log((double)nrDocsInCorpus/(double)dft);
+    	    	
+    	    	Iterator<PostingsEntry> it=curList.iterator();
+    	    	PostingsEntry curEnt=null;
+    	    	
+    	    	while(it.hasNext()){
+    	    	
+    	    		curEnt=it.next();
+    	    		double tf_idf=curEnt.getOffsets().size()*termIDF;
+    	    		Double curScore=scores.get(""+curEnt.getDocID());
+    	    		if(curScore==null){
+    	    			curScore=tf_idf;	
+    	    		}
+    	    		else{
+    	    			curScore=curScore+tf_idf;	
+    	    		}
+    	    		scores.put(""+curEnt.getDocID(),curScore);
+    	    		
+    	    	}
+    	    	
+    	    }
+    	    //Postingslist to save all entries
+    	    PostingsList finalList=new PostingsList();
+    	    //Now we divide all scores by their docLength
+    	    Iterator<String> keys=scores.keySet().iterator();
+    	    while(keys.hasNext()){
+    	    
+    	    	    String curKey=keys.next();
+    	    	    Integer docLength=this.docLengths.get(curKey);
+    	    	    Double curScore=scores.get(curKey);
+    	    	    int docID=Integer.parseInt(curKey);
+    	    	    double finalScore=curScore/docLength;
+    	    	    PostingsEntry ent=new PostingsEntry(docID);
+    	    	    ent.setScore(finalScore);
+    	    	    finalList.addEntry(ent);
+    	    }
+    	    
+    	    //When all entries are added we sort the finalList and pick out
+    	    //the top K entries
+    	    finalList.sortPostingsList();
+    	    if(finalList.size()<K || K==0){
+    	    	return finalList;	    
+    	    }
+    	    PostingsList retList=new PostingsList();
+    	    for(int i=0;i<K;i++){
+    	    	retList.addEntry(finalList.get(i));	    
+    	    }
+    	    return retList;
+    }
+    
 
 
     /**
