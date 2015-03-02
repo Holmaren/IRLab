@@ -19,6 +19,7 @@ import java.lang.Math;
 import java.io.*;
 
 
+
 /**
  *   Implements an inverted index as a Hashtable from words to PostingsLists.
  */
@@ -37,8 +38,13 @@ public class HashedIndex implements Index {
     private String docNamesFile="IndexDocNames.txt";
     private String docLengthFile="IndexDocLength.txt";
     
+    private HashMap<Integer,Double> pageRanks;
+    private HashMap<String,Integer> pageRankNamesToDocID;
+    
     
     public HashedIndex(){
+    	    pageRanks=this.readPageRankFromFile();
+    	    
     }
     
 
@@ -262,9 +268,22 @@ public class HashedIndex implements Index {
 		}
 	}
 	else if(queryType==Index.RANKED_QUERY){
-		
-		PostingsList res=this.fastCosineScore(query,0);
-		return res;
+		if(rankingType==Index.TF_IDF){
+			PostingsList res=this.fastCosineScore(query,0);
+			return res;
+		}
+		else if(rankingType==Index.PAGERANK){
+			PostingsList res=this.pageRankQuery(query);
+			return res;
+		}
+		else if(rankingType==Index.COMBINATION){
+			PostingsList res=this.CombinationRank(query,0);
+			return res;
+		}
+		else{
+			System.err.println("ERROR: Unknown rankingType");
+			return null;
+		}
 	}
 	else{
 		System.err.println("ERROR: QueryType not recognized or unimplemented");
@@ -628,13 +647,18 @@ public class HashedIndex implements Index {
     	    	int dft=curList.size();
     	    	double termIDF=Math.log((double)nrDocsInCorpus/(double)dft);
     	    	
+    	    	//System.err.println("Term:"+term);
+    	    	//System.err.println("dft:"+dft);
+    	    	//System.err.println("TermIDF:"+termIDF);
+    	    	
     	    	Iterator<PostingsEntry> it=curList.iterator();
     	    	PostingsEntry curEnt=null;
     	    	
     	    	while(it.hasNext()){
     	    	
     	    		curEnt=it.next();
-    	    		double tf_idf=curEnt.getOffsets().size()*termIDF;
+    	    		double tf=(double)curEnt.getOffsets().size();
+    	    		double tf_idf=tf*termIDF;
     	    		Double curScore=scores.get(""+curEnt.getDocID());
     	    		if(curScore==null){
     	    			curScore=tf_idf;	
@@ -657,7 +681,7 @@ public class HashedIndex implements Index {
     	    	    Integer docLength=this.docLengths.get(curKey);
     	    	    Double curScore=scores.get(curKey);
     	    	    int docID=Integer.parseInt(curKey);
-    	    	    double finalScore=curScore/docLength;
+    	    	    double finalScore=curScore/(double)docLength;
     	    	    PostingsEntry ent=new PostingsEntry(docID);
     	    	    ent.setScore(finalScore);
     	    	    finalList.addEntry(ent);
@@ -677,6 +701,241 @@ public class HashedIndex implements Index {
     }
     
 
+    private HashMap<Integer,Double> readPageRankFromFile(){
+    
+    	//System.err.println("Read PageRanks from file");
+    	    
+	String fileName="DavisPageRankText";
+	String dirName="pagerank";
+	String titlesFileName="articleTitles.txt";
+	
+	File pagerankDir=new File(dirName);
+	File davisPageRank=new File(pagerankDir,fileName);
+	File nameFile=new File(pagerankDir,titlesFileName);
+	
+	HashMap<Integer,Double> pageRank=new HashMap<Integer,Double>();
+	
+	pageRankNamesToDocID=new HashMap<String,Integer>();
+	
+	try{
+	
+		BufferedReader in=new BufferedReader(new InputStreamReader(new FileInputStream(davisPageRank)));
+    		
+		String line=in.readLine();
+		while(line!=null){
+		
+			String[] parts=line.split(" ");
+			Integer docID=Integer.parseInt(parts[0]);
+			Double rank=Double.parseDouble(parts[1]);
+			
+			pageRank.put(docID,rank);
+			line=in.readLine();
+		}
+		
+		
+    		in.close();
+    		
+    		in=new BufferedReader(new InputStreamReader(new FileInputStream(nameFile)));
+    		
+    		line=in.readLine();
+    		while(line!=null){
+		
+			String[] parts=line.split(";");
+			Integer docID=Integer.parseInt(parts[0]);
+			String name=parts[1];
+			
+			pageRankNamesToDocID.put(name,docID);
+			line=in.readLine();
+		}
+    		
+    		
+    		
+    		return pageRank;
+    		
+    	}catch(Exception e){
+    	    	   System.err.println("Error reading PageRank from file");
+    	    	   e.printStackTrace();
+    	    	    }
+    	    
+    	return null;
+    	
+    }
+    
+    /**
+    	Function to calculate the cosine score, combine it with PageRank
+    	and return the top K results
+    */
+    private PostingsList CombinationRank(Query q, int K){
+    	    
+    	    HashMap<String,Double> scores=new HashMap<String,Double>();
+    	    LinkedList<String> terms=q.terms;
+    	    
+    	    int nrDocsInCorpus=this.docIDs.keySet().size();
+    	    
+    	    //First add up all scores
+    	    for(String term:terms){
+    	    	
+    	    	PostingsList curList=index.get(term);
+    	    	if(curList==null){
+    	    		System.err.println("Error: PosingsList is empty. Term:"+term);	
+    	    	}
+    	    	int dft=curList.size();
+    	    	double termIDF=Math.log((double)nrDocsInCorpus/(double)dft);
+    	    	
+    	    	//System.err.println("Term:"+term);
+    	    	//System.err.println("dft:"+dft);
+    	    	//System.err.println("TermIDF:"+termIDF);
+    	    	
+    	    	Iterator<PostingsEntry> it=curList.iterator();
+    	    	PostingsEntry curEnt=null;
+    	    	
+    	    	while(it.hasNext()){
+    	    	
+    	    		curEnt=it.next();
+    	    		double tf=(double)curEnt.getOffsets().size();
+    	    		double tf_idf=tf*termIDF;
+    	    		Double curScore=scores.get(""+curEnt.getDocID());
+    	    		if(curScore==null){
+    	    			curScore=tf_idf;	
+    	    		}
+    	    		else{
+    	    			curScore=curScore+tf_idf;	
+    	    		}
+    	    		scores.put(""+curEnt.getDocID(),curScore);
+    	    		
+    	    	}
+    	    	
+    	    }
+    	    //Postingslist to save all entries
+    	    PostingsList finalList=new PostingsList();
+    	    //Now we divide all scores by their docLength
+    	    Iterator<String> keys=scores.keySet().iterator();
+    	    while(keys.hasNext()){
+    	    
+    	    	    String curKey=keys.next();
+    	    	    Integer docLength=this.docLengths.get(curKey);
+    	    	    Double curScore=scores.get(curKey);
+    	    	    int docID=Integer.parseInt(curKey);
+    	    	    double finalScore=curScore/(double)docLength;
+    	    	    finalScore=pageRankTFIDFCombination(docID,finalScore);
+    	    	    PostingsEntry ent=new PostingsEntry(docID);
+    	    	    ent.setScore(finalScore);
+    	    	    finalList.addEntry(ent);
+    	    }
+    	    
+    	    //When all entries are added we sort the finalList and pick out
+    	    //the top K entries
+    	    finalList.sortPostingsList();
+    	    if(finalList.size()<K || K==0){
+    	    	return finalList;	    
+    	    }
+    	    PostingsList retList=new PostingsList();
+    	    for(int i=0;i<K;i++){
+    	    	retList.addEntry(finalList.get(i));	    
+    	    }
+    	    return retList;
+    }
+    
+    private PostingsList pageRankQuery(Query query){
+    	    
+    	    HashMap<String,Double> scores=new HashMap<String,Double>();
+    	    LinkedList<String> terms=query.terms;
+    	    
+    	    //First add up all scores
+    	    for(String term:terms){
+    	    	
+    	    	PostingsList curList=index.get(term);
+    	    	if(curList==null){
+    	    		System.err.println("Error: PosingsList is empty. Term:"+term);	
+    	    	}
+    	    	
+    	    	Iterator<PostingsEntry> it=curList.iterator();
+    	    	PostingsEntry curEnt=null;
+    	    	
+    	    	while(it.hasNext()){
+    	    		curEnt=it.next();
+    	    		double curPageRank=this.getPageRank(curEnt.getDocID());
+    	    		scores.put(""+curEnt.getDocID(),curPageRank);	
+    	    	}
+    	    	
+    	    }
+    	    //Postingslist to save all entries
+    	    PostingsList finalList=new PostingsList();
+    	    //Now we divide all scores by their docLength
+    	    Iterator<String> keys=scores.keySet().iterator();
+    	    while(keys.hasNext()){
+    	    
+    	    	    String curKey=keys.next();
+    	    	    Integer docLength=this.docLengths.get(curKey);
+    	    	    Double curPageRank=scores.get(curKey);
+    	    	    int docID=Integer.parseInt(curKey);
+    	    	    PostingsEntry ent=new PostingsEntry(docID);
+    	    	    ent.setScore(curPageRank);
+    	    	    finalList.addEntry(ent);
+    	    }
+    	    
+    	    //When all entries are added we sort the finalList and pick out
+    	    //the top K entries
+    	    finalList.sortPostingsList();
+    	    	
+    	    return finalList;	    
+    	    
+    	    
+    }
+
+	/**
+	Function to combine the TF_IDF score with the pageRank
+	*/
+    private double pageRankTFIDFCombination(int docID, double tfIDF){
+    
+    	    double pageRankInfluence=0.5;
+
+    	    //First we need to get the correct pageRankDocID
+    	    String docName=this.docIDs.get(""+docID);
+    	    //String[] splitUp=docName.split("/");
+    	    //String parsedDocName=splitUp[1].substring(0,splitUp[1].length()-2);
+    	    String parsedDocName=docName.substring(10,docName.length()-2);
+    	    //System.err.println("DocName "+parsedDocName);
+    	    
+    	    Integer pageRankDocID=this.pageRankNamesToDocID.get(parsedDocName);
+    	    
+    	    Double pageRank=pageRanks.get(pageRankDocID);
+    	    if(pageRank==null){
+    	    	System.err.println("PageRank is null for docID:"+docID+ " docName:"+this.docIDs.get(""+docID));	    
+    	    	pageRank=0.0;
+    	    }
+    	    //Scale pageRank by 100 to get it in the same scale as the tf_idf
+    	    pageRank=pageRank*100;
+    	    
+    	    double finalScore=tfIDF*(1-pageRankInfluence)+pageRank*pageRankInfluence;
+    	    
+    	    return finalScore;
+    }
+    
+    /**
+    	Function to get the pageRank for a specific documentID
+    */
+    private double getPageRank(int docID){
+
+    	    //First we need to get the correct pageRankDocID
+    	    String docName=this.docIDs.get(""+docID);
+    	    //String[] splitUp=docName.split("/");
+    	    //String parsedDocName=splitUp[1].substring(0,splitUp[1].length()-2);
+    	    String parsedDocName=docName.substring(10,docName.length()-2);
+    	    //System.err.println("DocName "+parsedDocName);
+    	    
+    	    Integer pageRankDocID=this.pageRankNamesToDocID.get(parsedDocName);
+    	    
+    	    Double pageRank=pageRanks.get(pageRankDocID);
+    	    if(pageRank==null){
+    	    	System.err.println("PageRank is null for docID:"+docID+ " docName:"+this.docIDs.get(""+docID));	    
+    	    	pageRank=0.0;
+    	    }
+
+	    return pageRank;
+    	    
+    }
+    	    
 
     /**
      *  No need for cleanup in a HashedIndex.

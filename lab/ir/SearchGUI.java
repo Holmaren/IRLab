@@ -197,6 +197,7 @@ public class SearchGUI extends JFrame {
 			    }
 			    else {
 				buf.append( filename );
+				//buf.append( " " + results.get(i).docID );
 			    }
 			    if ( queryType == Index.RANKED_QUERY ) {
 				buf.append( "   " + String.format( "%.5f", results.get(i).score )); 
