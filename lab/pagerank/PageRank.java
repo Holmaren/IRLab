@@ -185,7 +185,7 @@ public class PageRank{
 	
 	int useMethod=5;
 	
-	int multiplyIBy=1;
+	int multiplyIBy=10;
 	
 	System.err.println("Using Monte-Carlo method number "+useMethod);
 	
@@ -271,13 +271,19 @@ public class PageRank{
 	/*
 	ArrayList<PageRankEntry> pageRanks=this.sortPageRanks(res, numberOfDocs);
 	
-	
 	for(int i=0;i<50;i++){
 	
 		System.err.println((i+1)+". "+pageRanks.get(i).toString());
 		
 	}
+	*/
+	/*
+	for(int i=0;i<50;i++){
 	
+		System.err.println((i+1)+". "+powerItResults.get(i).toString());
+		
+	}*/
+	/*
 	//Used to write the results to a file (to be used with the search method)
 	//this.writeResultToFile(pageRanks);
 	this.writeResultAsHashMap(pageRanks);*/

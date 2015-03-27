@@ -637,15 +637,21 @@ public class HashedIndex implements Index {
     	    
     	    HashMap<String,Double> scores=new HashMap<String,Double>();
     	    LinkedList<String> terms=q.terms;
+    	    LinkedList<Double> termWeights=q.weights;
     	    
     	    int nrDocsInCorpus=this.docIDs.keySet().size();
     	    
     	    //First add up all scores
-    	    for(String term:terms){
+    	    for(int i=0;i<terms.size();i++){
     	    	
+    	    	String term=terms.get(i);
+    	    	double termWeight=termWeights.get(i);
+    	    	    
     	    	PostingsList curList=index.get(term);
     	    	int dft=curList.size();
     	    	double termIDF=Math.log((double)nrDocsInCorpus/(double)dft);
+    	    	//Multiply the termWeight to the termIDF
+    	    	termIDF=termIDF*termWeight;
     	    	
     	    	//System.err.println("Term:"+term);
     	    	//System.err.println("dft:"+dft);
@@ -888,7 +894,7 @@ public class HashedIndex implements Index {
 	*/
     private double pageRankTFIDFCombination(int docID, double tfIDF){
     
-    	    double pageRankInfluence=0.5;
+    	    double pageRankInfluence=0.3;
 
     	    //First we need to get the correct pageRankDocID
     	    String docName=this.docIDs.get(""+docID);

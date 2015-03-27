@@ -18,6 +18,7 @@ import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.io.IOException;
 import java.util.LinkedList;
+import java.lang.StringBuilder;
 import org.apache.pdfbox.cos.COSDocument;
 import org.apache.pdfbox.pdfparser.*;
 import org.apache.pdfbox.util.PDFTextStripper;
@@ -122,6 +123,59 @@ public class Indexer {
 	    }
 	}
     }
+    
+    //Returns a tokenizer with the content of the file
+    public static String processFile( File f ) {
+	// do not try to index fs that cannot be read
+	if ( f.canRead() ) {
+		//System.err.println("ProcessFiles");
+		//System.err.println("SaveIndex="+SearchGUI.saveIndex);
+	    if ( f.isDirectory() ) {
+		System.err.println("The file is a directory");
+		return null;
+	    } else {
+		try {
+		    //  Read the first few bytes of the file to see if it is 
+		    // likely to be a PDF 
+		    Reader reader = new FileReader( f );
+		    char[] buf = new char[4];
+		    reader.read( buf, 0, 4 );
+		    if ( buf[0] == '%' && buf[1]=='P' && buf[2]=='D' && buf[3]=='F' ) {
+			// We assume this is a PDF file
+			try {
+			    String contents = extractPDFContents( f );
+			    reader = new StringReader( contents );
+			}
+			catch ( IOException e ) {
+			    // Perhaps it wasn't a PDF file after all
+			    reader = new FileReader( f );
+			}
+		    }
+		    else {
+			// We hope this is ordinary text
+			reader = new FileReader( f );
+		    }
+		    SimpleTokenizer tok = new SimpleTokenizer( reader );
+		    StringBuilder fileContent=new StringBuilder();
+		    while ( tok.hasMoreTokens() ) {
+			String token = tok.nextToken();
+			fileContent.append(token);
+			fileContent.append(" ");
+		    }
+		    
+		    String retString=fileContent.toString();
+		    retString.trim();
+		    
+		    reader.close();
+		    return retString;
+		}
+		catch ( IOException e ) {
+		    e.printStackTrace();
+		}
+	    }
+	}
+	return null;
+    }
 
     public void flushIndex(){
     	index.flushIndex();	    
@@ -135,7 +189,7 @@ public class Indexer {
     /**
      *  Extracts the textual contents from a PDF file as one long string.
      */
-    public String extractPDFContents( File f ) throws IOException {
+    public static String extractPDFContents( File f ) throws IOException {
 	FileInputStream fi = new FileInputStream( f );
 	PDFParser parser = new PDFParser( fi );   
 	parser.parse();   
