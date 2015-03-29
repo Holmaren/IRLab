@@ -41,6 +41,9 @@ public class HashedIndex implements Index {
     private HashMap<Integer,Double> pageRanks;
     private HashMap<String,Integer> pageRankNamesToDocID;
     
+    private final boolean OPTIMIZATION=true;
+    private final double IDF_THRESHOLD=1.5;
+    
     
     public HashedIndex(){
     	    pageRanks=this.readPageRankFromFile();
@@ -269,7 +272,10 @@ public class HashedIndex implements Index {
 	}
 	else if(queryType==Index.RANKED_QUERY){
 		if(rankingType==Index.TF_IDF){
+			long timeBefore=System.nanoTime();
 			PostingsList res=this.fastCosineScore(query,0);
+			long timeTaken=System.nanoTime()-timeBefore;
+			System.err.println("Time taken:"+timeTaken+"ns");
 			return res;
 		}
 		else if(rankingType==Index.PAGERANK){
@@ -650,6 +656,17 @@ public class HashedIndex implements Index {
     	    	PostingsList curList=index.get(term);
     	    	int dft=curList.size();
     	    	double termIDF=Math.log((double)nrDocsInCorpus/(double)dft);
+    	    	
+    	    	//Implementation of optimization
+    	    	if(OPTIMIZATION){
+    	    		//If the termIDF is less than the threshold skip this term
+    	    		if(termIDF<IDF_THRESHOLD){
+    	    			continue;	
+    	    		}
+    	    	}
+    	    	
+    	    	System.err.println("Term:"+term);
+    	    	
     	    	//Multiply the termWeight to the termIDF
     	    	termIDF=termIDF*termWeight;
     	    	
