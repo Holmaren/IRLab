@@ -16,7 +16,6 @@ import java.util.LinkedList;
 import java.util.Set;
 import java.util.ArrayList;
 import java.lang.Math;
-import java.io.*;
 
 
 
@@ -26,14 +25,13 @@ import java.io.*;
 public class BiwordIndex implements Index {
 
     /** The index as a hashtable. */
-    private HashMap<String,PostingsList> index = new HashMap<String,PostingsList>(10000);
+    private HashMap<String,PostingsList> index = new HashMap<String,PostingsList>(50000);
 
     private String lastToken=null;
     private int lastTokenOffset=-1;
     private int lastDocID=-1;
     
     
-
     public BiwordIndex(){
     	    
     }
@@ -43,7 +41,7 @@ public class BiwordIndex implements Index {
      *  Inserts this token in the index.
      */
     public void insert( String token, int docID, int offset ) {
- 
+    	    
     	//First check if this is a new document (docID different)
     	if(docID!=lastDocID){
     		lastToken=null;
@@ -66,15 +64,15 @@ public class BiwordIndex implements Index {
 		//If there is no entry for the docID
 		if(!list.checkContains(docID)){
 			PostingsEntry newEntry=new PostingsEntry(docID);
-			newEntry.setDocName(this.docIDs.get(""+docID));
+			//newEntry.setDocName(this.docIDs.get(""+docID));
 			//System.err.println(this.docIDs.get(""+docID));
 			newEntry.addOffset(biwordOffset);
 			list.addEntry(newEntry);	
 		}
-		//Else if there already is a entry just add the offset
 		else{
-			list.addOffsetToLastEntry(biwordOffset); 
+		list.addOffsetToLastEntry(offset); 
 		}
+		
 	}
 	lastToken=token;
 	lastTokenOffset=offset;
@@ -130,28 +128,34 @@ public class BiwordIndex implements Index {
     	    
     	    int nrDocsInCorpus=this.docIDs.keySet().size();
     	    
+    	    String lastTerm=null;
+    	    
     	    //First add up all scores
     	    for(int i=0;i<terms.size();i++){
     	    	
-    	    	String term=terms.get(i);
-    	    	double termWeight=termWeights.get(i);
-    	    	    
-    	    	PostingsList curList=index.get(term);
-    	    	int dft=curList.size();
-    	    	double termIDF=Math.log((double)nrDocsInCorpus/(double)dft);
-    	    	
-    	    	//Implementation of optimization
-    	    	if(OPTIMIZATION){
-    	    		//If the termIDF is less than the threshold skip this term
-    	    		if(termIDF<IDF_THRESHOLD){
-    	    			continue;	
-    	    		}
+    	    	if(lastTerm==null){
+    	    		lastTerm=terms.get(i);
+    	    		continue;	
     	    	}
+    	    	
+    	    	//Create the biword term
+    	    	String term=lastTerm+" "+terms.get(i);
+    	    	//update the lastTerm
+    	    	lastTerm=terms.get(i);
+    	    	    
     	    	
     	    	System.err.println("Term:"+term);
     	    	
-    	    	//Multiply the termWeight to the termIDF
-    	    	termIDF=termIDF*termWeight;
+    	    	PostingsList curList=index.get(term);
+    	    	if(curList==null){
+    	    		continue;	
+    	    	}
+    	    	
+    	    	int dft=curList.size();
+    	    	double termIDF=Math.log((double)nrDocsInCorpus/(double)dft);
+    	    	
+    	    	
+    	    	
     	    	
     	    	//System.err.println("Term:"+term);
     	    	//System.err.println("dft:"+dft);
@@ -207,7 +211,9 @@ public class BiwordIndex implements Index {
     }
     
 
-    
+    public void flushIndex(){
+    	    
+    }
 
     
 

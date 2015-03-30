@@ -31,6 +31,7 @@ public class HashedIndex implements Index {
     private int filesProcessedSinceClear=0;
     private int maxFilesProcessedBeforeClear=10000;
     private int lastDocID=-1;
+    private int filesProcessed=0;
     
     private String filePrefix="index";
     
@@ -44,6 +45,10 @@ public class HashedIndex implements Index {
     private final boolean OPTIMIZATION=true;
     private final double IDF_THRESHOLD=1.5;
     
+    private int SUBPHRASE_K=20;
+    private double SUBPHRASE_SCALE=0.5;
+    
+    private BiwordIndex biwordIndex=new BiwordIndex();
     
     public HashedIndex(){
     	    pageRanks=this.readPageRankFromFile();
@@ -100,6 +105,15 @@ public class HashedIndex implements Index {
 	//Else if there already is a entry just add the offset
 	else{
 		list.addOffsetToLastEntry(offset); 
+	}
+	
+	//Also create the biword index
+		biwordIndex.insert(token,docID,offset);
+	
+	
+	if(lastDocID!=docID){
+		lastDocID=docID;
+		filesProcessed++;
 	}
 	
     }
@@ -272,11 +286,26 @@ public class HashedIndex implements Index {
 	}
 	else if(queryType==Index.RANKED_QUERY){
 		if(rankingType==Index.TF_IDF){
-			long timeBefore=System.nanoTime();
-			PostingsList res=this.fastCosineScore(query,0);
-			long timeTaken=System.nanoTime()-timeBefore;
-			System.err.println("Time taken:"+timeTaken+"ns");
-			return res;
+			if(structureType==Index.UNIGRAM){
+				long timeBefore=System.nanoTime();
+				PostingsList res=this.fastCosineScore(query,0);
+				long timeTaken=System.nanoTime()-timeBefore;
+				System.err.println("Time taken:"+timeTaken+"ns");
+				return res;
+			}
+			else if(structureType==Index.BIGRAM){
+				return biwordIndex.search(query, queryType,rankingType,structureType);
+			}
+			else if(structureType==Index.SUBPHRASE){
+						
+				PostingsList ret=this.subphraseQuery(query,queryType,rankingType,structureType);
+				
+				return ret;
+			}
+			else{
+				System.err.println("ERROR: Unknown structureType");
+				return null;
+			}
 		}
 		else if(rankingType==Index.PAGERANK){
 			PostingsList res=this.pageRankQuery(query);
@@ -297,6 +326,9 @@ public class HashedIndex implements Index {
 	}
     }
     
+    /**
+    	Function to intersect two postingslists. 
+    */
     private PostingsList intersect(PostingsList p1, PostingsList p2){
     	   
     	   //If either postingslist is null or empty return null
@@ -593,7 +625,8 @@ public class HashedIndex implements Index {
     	    				curP2=it2.next();	
     	    			}
     	    			else{
-    	    				curP2=null;
+    	    				//Then both lists are empty and we break
+    	    				break;
     	    			}
     	    		}
     	    		//If iterator 2 is empty
@@ -603,11 +636,39 @@ public class HashedIndex implements Index {
     	    				curP1=it1.next();	
     	    			}
     	    			else{
-    	    				curP1=null;	
+    	    				//Then we can break the loop
+    	    				break;
     	    			}
     	    		}
     	    		else{
-    	    			if(curP1.getDocID()<=curP2.getDocID()){
+    	    			if(curP1==null || curP2==null){
+    	    				continue;	
+    	    			}
+    	    			if(curP1.getDocID()==curP2.getDocID()){
+    	    				PostingsEntry useEntry=null;
+    	    				if(curP1.score>=curP2.score){
+    	    					useEntry=curP1;	
+    	    				}
+    	    				else{
+    	    					useEntry=curP2;	
+    	    				}
+    	    				//Add the entry
+    	    				res.addEntry(useEntry);
+    	    				//Update current postingsEntries
+    	    				if(it1.hasNext()){
+    	    					curP1=it1.next();	
+    	    				}
+    	    				else{
+    	    					curP1=null;	
+    	    				}
+    	    				if(it2.hasNext()){
+    	    					curP2=it2.next();	
+    	    				}
+    	    				else{
+    	    					curP2=null;	
+    	    				}
+    	    			}
+    	    			else if(curP1.getDocID()<curP2.getDocID()){
     	    				res.addEntry(curP1);
     	    				if(it1.hasNext()){
     	    					curP1=it1.next();	
@@ -959,7 +1020,44 @@ public class HashedIndex implements Index {
     	    
     }
     	    
+    private PostingsList subphraseQuery(Query query, int queryType, int rankingType, int structureType){
+    
+    	    //Get the biword list
+    	    PostingsList biwordList=biwordIndex.search(query,queryType,rankingType,structureType);
+    	    //If there is enough results in the biword list
+    	    if(biwordList.size()>SUBPHRASE_K){
+    	    	    return biwordList;	
+    	    }
+    	    //If there is not enough results get the uniword list
+    	    PostingsList uniwordList=this.fastCosineScore(query,0);
 
+    	    //Now we should scale the scores so that the biword is worth more than the uniword
+    	    //First the biword list
+    	    double biwordScale=2.0/SUBPHRASE_SCALE;
+    	    for(int i=0;i<biwordList.size();i++){
+    	    	    biwordList.get(i).score=biwordList.get(i).score*biwordScale;
+    	    }
+    	    //Then the uniword list
+    	    double uniwordScale=1.0/SUBPHRASE_SCALE;
+    	    for(int i=0;i<uniwordList.size();i++){
+    	    	uniwordList.get(i).score=uniwordList.get(i).score*uniwordScale;	    
+    	    }
+    	    
+    	    //Then we need to sort the lists according to docID to be able to merge the two
+    	    biwordList.sortListOnDocID();
+    	    uniwordList.sortListOnDocID();
+    	    
+    	    
+    	    //Now merge the two
+    	    PostingsList merged=this.mergeLists(biwordList,uniwordList);
+    	    
+    	    return merged;
+    	    
+	    
+    }
+    
+    
+    
     /**
      *  No need for cleanup in a HashedIndex.
      */

@@ -13,6 +13,7 @@ import java.io.Serializable;
 import java.util.Iterator;
 import java.lang.StringBuffer;
 import java.util.Collections;
+import java.util.Comparator;
 
 /**
  *   A list of postings for a given word.
@@ -107,9 +108,22 @@ public class PostingsList implements Serializable {
     	    
     }
     
+    public void sortListOnDocID(){
+    	    
+    	    Collections.sort(list,new PostingsEntryIDComparator());
+    	    
+    }
+    
     //
     //  YOUR CODE HERE
     //
+}
+
+class PostingsEntryIDComparator implements Comparator<PostingsEntry> {
+    @Override
+    public int compare(PostingsEntry a, PostingsEntry b) {
+        return a.docID < b.docID ? -1 : a.docID == b.docID ? 0 : 1;
+    }
 }
 	
 
